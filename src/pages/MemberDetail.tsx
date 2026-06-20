@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft, Play, CreditCard, Activity,
   Scale, Flame, Target, Trash2, Plus, History, Receipt,
+  Edit3, BookOpen,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { BodyChart } from '@/components/ui/BodyChart';
@@ -57,6 +58,7 @@ export default function MemberDetail() {
   const rC = useAppStore((s) => s.renewClasses);
   const sS = useAppStore((s) => s.startSession);
   const aM = useAppStore((s) => s.addMeasurement);
+  const uSN = useAppStore((s) => s.updateSessionNote);
   const sessions = useAppStore((s) => s.sessions);
   const gRM = useAppStore((s) => s.getRenewalRecordsByMember);
   const renewalRecords = useMemo(() => gRM(id), [id, gRM]);
@@ -67,6 +69,8 @@ export default function MemberDetail() {
   const [showM, setShowM] = useState(false);
   const [showR, setShowR] = useState(false);
   const [amt, setAmt] = useState(20);
+  const [noteSid, setNoteSid] = useState<string | null>(null);
+  const [noteText, setNoteText] = useState('');
 
   const mss = useMemo(() => gMM(id), [id, gMM]);
   const ss = useMemo(() => gSM(id), [id, gSM]);
@@ -181,21 +185,46 @@ export default function MemberDetail() {
                 ))}
               </div>
               {ss.length === 0 ? <div className="py-8 text-center text-ink-500 text-sm">暂无课程记录</div> : (
-                <div className="overflow-x-auto rounded-xl border border-ink-100">
-                  <table className="w-full text-sm">
-                    <thead className="bg-ink-50"><tr className="text-xs text-ink-500">
-                      <th className="text-left px-3 py-2 font-medium">日期</th><th className="text-left px-3 py-2 font-medium">教练</th><th className="text-right px-3 py-2 font-medium">时长</th><th className="text-right px-3 py-2 font-medium">课时</th><th className="text-center px-3 py-2 font-medium">状态</th>
-                    </tr></thead>
-                    <tbody>{ss.slice(0, 30).map((s) => { const st = SSM[s.status] || SSM.scheduled; return (
-                      <tr key={s.id} className="border-t border-ink-100 hover:bg-ink-50/50">
-                        <td className="px-3 py-2">{formatDateTime(s.startTime)}</td>
-                        <td className="px-3 py-2">{gC(s.coachId)?.name || '--'}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{s.durationMin}分</td>
-                        <td className="px-3 py-2 text-right tabular-nums font-medium text-brand-600">{s.classesConsumed}</td>
-                        <td className="px-3 py-2 text-center"><span className={cn('badge text-[10px]', st.c)}>{st.l}</span></td>
-                      </tr>
-                    ); })}</tbody>
-                  </table>
+                <div className="space-y-2.5">
+                  {ss.slice(0, 30).map((s) => {
+                    const st = SSM[s.status] || SSM.scheduled;
+                    const coach = gC(s.coachId);
+                    return (
+                      <div key={s.id} className="p-3.5 rounded-xl border border-ink-100 hover:border-brand-200 transition">
+                        <div className="flex items-center gap-3">
+                          <div className="w-11 h-11 rounded-lg bg-brand-50 border border-brand-100 flex flex-col items-center justify-center shrink-0">
+                            <span className="text-[10px] text-brand-600 leading-none font-medium">{formatDate(s.startTime, 'MM/DD')}</span>
+                            <span className="text-xs font-semibold text-brand-700 mt-0.5 tabular-nums">{formatDateTime(s.startTime).slice(-5)}</span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium text-sm text-ink-900">{coach?.name || '--'} · 私教课</p>
+                              <span className={cn('badge text-[10px]', st.c)}>{st.l}</span>
+                            </div>
+                            <p className="text-xs text-ink-500 mt-0.5 tabular-nums">
+                              时长 {s.durationMin || '--'} 分 · 消耗 {s.classesConsumed} 课时
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => { setNoteSid(s.id); setNoteText(s.note || ''); }}
+                            className="btn-sm btn-outline !px-2 flex items-center gap-1"
+                            title="课堂小结"
+                          >
+                            <BookOpen className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">{s.note ? '编辑' : '补小结'}</span>
+                          </button>
+                        </div>
+                        {s.note && (
+                          <div className="mt-3 p-3 rounded-lg bg-brand-50/50 border border-brand-100/60">
+                            <p className="text-[11px] text-brand-700 font-semibold mb-1.5 flex items-center gap-1.5">
+                              <BookOpen className="w-3.5 h-3.5" />课堂小结
+                            </p>
+                            <p className="text-sm text-ink-700 whitespace-pre-wrap leading-relaxed">{s.note}</p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -232,30 +261,42 @@ export default function MemberDetail() {
                   暂无续费记录
                 </div>
               ) : (
-                <div className="overflow-x-auto rounded-xl border border-ink-100">
-                  <table className="w-full text-sm">
-                    <thead className="bg-ink-50"><tr className="text-xs text-ink-500">
-                      <th className="text-left px-3 py-2 font-medium">续费时间</th>
-                      <th className="text-right px-3 py-2 font-medium">续费课时</th>
-                      <th className="text-left px-3 py-2 font-medium">操作入口</th>
-                    </tr></thead>
-                    <tbody>{renewalRecords.map((r) => (
-                      <tr key={r.id} className="border-t border-ink-100 hover:bg-ink-50/50">
-                        <td className="px-3 py-2.5 text-ink-700 tabular-nums">{formatDateTime(r.purchaseDate)}</td>
-                        <td className="px-3 py-2.5 text-right">
-                          <span className="badge bg-emerald-50 text-success font-semibold">+{r.classesPurchased}</span>
-                        </td>
-                        <td className="px-3 py-2.5">
-                          <span className="badge bg-ink-100 text-ink-600">{
-                            r.source === 'dashboard' ? '仪表盘快捷续费' :
-                            r.source === 'member_detail' ? '会员详情页' :
-                            r.source === 'reports' ? '统计报表' :
-                            r.source === 'batch' ? '批量续费' : '手动续费'
-                          }</span>
-                        </td>
-                      </tr>
-                    ))}</tbody>
-                  </table>
+                <div className="space-y-2.5">
+                  {renewalRecords.map((r) => (
+                    <div key={r.id} className="rounded-xl border border-ink-100 overflow-hidden hover:shadow-soft transition">
+                      <div className="flex items-center gap-3 p-3.5">
+                        <div className="w-10 h-10 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-center shrink-0">
+                          <CreditCard className="w-4.5 h-4.5 text-success" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="font-semibold text-sm text-ink-900">续费 +{r.classesPurchased} 课时</p>
+                            <span className="badge bg-ink-100 text-ink-600 text-[10px]">
+                              {r.source === 'dashboard' ? '仪表盘' :
+                               r.source === 'member_detail' ? '会员详情' :
+                               r.source === 'reports' ? '统计报表' :
+                               r.source === 'batch' ? '批量续费' : '手动'}
+                            </span>
+                          </div>
+                          <p className="text-xs text-ink-500 mt-0.5 tabular-nums">{formatDateTime(r.purchaseDate)}</p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="font-display font-bold text-lg text-success">+{r.classesPurchased}</p>
+                          <p className="text-[10px] text-ink-400">课时</p>
+                        </div>
+                      </div>
+                      {r.followUpNote && (
+                        <div className="px-3.5 pb-3.5">
+                          <div className="p-3 rounded-lg bg-amber-50/60 border border-amber-100">
+                            <p className="text-[10px] text-amber-700 font-semibold mb-1 flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />跟进备注
+                            </p>
+                            <p className="text-sm text-ink-700 whitespace-pre-wrap">{r.followUpNote}</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -291,6 +332,40 @@ export default function MemberDetail() {
             <div className="flex gap-2">
               <button onClick={() => setShowR(false)} className="btn-outline flex-1">取消</button>
               <button onClick={() => { if (amt > 0) { rC(m.id, amt, 'member_detail'); setShowR(false); } }} className="btn-primary flex-1">确认 +{amt}</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {noteSid && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in" onClick={() => setNoteSid(null)}>
+          <div className="card p-5 w-full max-w-lg animate-fade-up" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-bold text-ink-900 flex items-center gap-2">
+                <BookOpen className="w-4.5 h-4.5 text-brand-500" />课堂小结
+              </h3>
+              <button onClick={() => setNoteSid(null)} className="w-8 h-8 rounded-lg hover:bg-ink-100 flex items-center justify-center text-ink-400">
+                <Edit3 className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-xs text-ink-500 mb-4">
+              记录训练内容、会员状态、下次建议等 · 保存后会员端可见
+            </p>
+            <textarea
+              value={noteText}
+              onChange={(e) => setNoteText(e.target.value)}
+              rows={8}
+              placeholder={`训练内容：\n会员状态：\n下次建议：`}
+              className="input-base resize-none font-sans leading-relaxed"
+            />
+            <div className="flex gap-2 mt-5">
+              <button onClick={() => setNoteSid(null)} className="btn-outline flex-1">取消</button>
+              <button
+                onClick={() => {
+                  uSN(noteSid, noteText.trim());
+                  setNoteSid(null);
+                }}
+                className="btn-primary flex-1"
+              >保存小结</button>
             </div>
           </div>
         </div>

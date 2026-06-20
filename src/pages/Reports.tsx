@@ -27,7 +27,7 @@ import {
 import { useAppStore } from '@/store/useAppStore';
 import { StatBarChart } from '@/components/ui/StatBarChart';
 import { DataCard } from '@/components/ui/DataCard';
-import { getCoachStats } from '@/utils/calculations';
+import { getCoachStats, isChurnRisk } from '@/utils/calculations';
 import { formatDate, formatDateTime, todayISO, addDays, daysSince } from '@/utils/date';
 import { cn } from '@/lib/utils';
 import type { Member } from '@/shared/types';
@@ -54,6 +54,7 @@ export default function Reports() {
   const [churnFilter, setChurnFilter] = useState<ChurnFilter>('all');
   const [selectedRenewIds, setSelectedRenewIds] = useState<Set<string>>(new Set());
   const [batchAmt, setBatchAmt] = useState(20);
+  const [batchNote, setBatchNote] = useState('');
   const [showBatchModal, setShowBatchModal] = useState(false);
 
   const range = useMemo(() => {
@@ -145,6 +146,39 @@ export default function Reports() {
     return months;
   }, [members, renewalRecords]);
 
+  const periodRenewals = useMemo(() => {
+    const s = new Date(range.start + ' 00:00:00').getTime();
+    const e = new Date(range.end + ' 23:59:59').getTime();
+    return renewalRecords.filter((r) => {
+      const rt = new Date(r.purchaseDate).getTime();
+      return rt >= s && rt <= e;
+    });
+  }, [renewalRecords, range]);
+
+  const periodRenewalSummary = useMemo(() => {
+    const s = new Date(range.start + ' 00:00:00').getTime();
+    const e = new Date(range.end + ' 23:59:59').getTime();
+    const renewedMemberIds = new Set(
+      renewalRecords
+        .filter((r) => {
+          const rt = new Date(r.purchaseDate).getTime();
+          return rt >= s && rt <= e;
+        })
+        .map((r) => r.memberId)
+    );
+    const renewed = renewedMemberIds.size;
+    const stillLow = members.filter(
+      (m) =>
+        !renewedMemberIds.has(m.id) &&
+        m.remainingClasses > 0 &&
+        m.remainingClasses <= 3
+    ).length;
+    const expiringTotal = renewed + stillLow;
+    const rate = expiringTotal > 0 ? Math.round((renewed / expiringTotal) * 100) : 0;
+    const totalClasses = periodRenewals.reduce((sum, r) => sum + r.classesPurchased, 0);
+    return { rate, renewed, expired: expiringTotal, count: periodRenewals.length, totalClasses };
+  }, [renewalRecords, members, range, periodRenewals]);
+
   const totalRenewalCount = renewalRecords.length;
   const totalRenewalClasses = renewalRecords.reduce((s, r) => s + r.classesPurchased, 0);
 
@@ -166,11 +200,12 @@ export default function Reports() {
   const churnList: (Member & { daysSinceLast: number; risk: 'high' | 'dormant' | 'normal' })[] =
     useMemo(() => {
       const all = members.map((m) => {
-        const days = m.lastCheckIn ? daysSince(m.lastCheckIn) : 9999;
+        const days = m.lastCheckIn ? daysSince(m.lastCheckIn) : daysSince(m.joinDate);
+        const neverChecked = !m.lastCheckIn;
         let level: 'high' | 'dormant' | 'normal' = 'normal';
-        if (days >= 30) level = 'high';
+        if (isChurnRisk(m)) level = 'high';
         else if (days >= 15) level = 'dormant';
-        return { ...m, daysSinceLast: days, risk: level };
+        return { ...m, daysSinceLast: days, neverChecked, risk: level };
       });
       if (churnFilter !== 'all') return all.filter((x) => x.risk === churnFilter);
       return all.sort((a, b) => b.daysSinceLast - a.daysSinceLast);
@@ -181,10 +216,12 @@ export default function Reports() {
     let dormant = 0;
     let normal = 0;
     members.forEach((m) => {
-      const d = m.lastCheckIn ? daysSince(m.lastCheckIn) : 9999;
-      if (d >= 30) high++;
-      else if (d >= 15) dormant++;
-      else normal++;
+      if (isChurnRisk(m)) high++;
+      else {
+        const d = m.lastCheckIn ? daysSince(m.lastCheckIn) : daysSince(m.joinDate);
+        if (d >= 15) dormant++;
+        else normal++;
+      }
     });
     return [
       { name: '流失风险', value: high, color: '#EF4444' },
@@ -312,25 +349,25 @@ export default function Reports() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <DataCard
           title="续费率"
-          value={`${renewalSummary.rate}%`}
+          value={`${periodRenewalSummary.rate}%`}
           icon={TrendingUp}
           color="success"
         />
         <DataCard
           title="续费人数"
-          value={renewalSummary.renewed}
+          value={periodRenewalSummary.renewed}
           icon={RefreshCcw}
           color="brand"
         />
         <DataCard
           title="续费次数"
-          value={totalRenewalCount}
+          value={periodRenewalSummary.count}
           icon={Receipt as typeof TrendingUp}
           color="accent"
         />
         <DataCard
           title="累计续费课时"
-          value={totalRenewalClasses}
+          value={periodRenewalSummary.totalClasses}
           icon={Users}
           color="warning"
         />
@@ -489,11 +526,12 @@ export default function Reports() {
           <h3 className="section-title flex items-center gap-2">
             <Receipt className="w-4 h-4 text-brand-500" />
             续费记录明细
-            <span className="ml-auto text-xs font-normal text-ink-500">共 {renewalRecords.length} 条记录 · {totalRenewalClasses} 课时</span>
+            <span className="ml-auto text-xs font-normal text-ink-500">当前周期共 {periodRenewals.length} 条 · {periodRenewalSummary.totalClasses} 课时</span>
           </h3>
         </div>
-        {renewalRecords.length === 0 ? (
-          <div className="p-10 text-center text-ink-500">暂无续费记录</div>
+        {periodRenewals.length === 0 ? (
+          <div className="p-10 text-center text-ink-500">
+          周期内暂无续费记录</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px]">
@@ -505,7 +543,7 @@ export default function Reports() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-ink-100">
-                {[...renewalRecords]
+                {[...periodRenewals]
                   .sort((a, b) => new Date(b.purchaseDate).getTime() - new Date(a.purchaseDate).getTime())
                   .slice(0, 50)
                   .map((r) => {
@@ -565,13 +603,24 @@ export default function Reports() {
                 ))}
               </div>
             </div>
+            <div className="mb-5">
+              <label className="input-label">跟进备注 <span className="text-ink-400 font-normal text-[11px]">可选 · 同步到会员续费记录</span></label>
+              <textarea
+                value={batchNote}
+                onChange={(e) => setBatchNote(e.target.value)}
+                placeholder="例：618活动续20节赠2节 / 老客户续费率..."
+                rows={3}
+                className="input-base resize-none"
+              />
+            </div>
             <div className="flex gap-2">
-              <button onClick={() => setShowBatchModal(false)} className="btn-outline flex-1">取消</button>
+              <button onClick={() => { setShowBatchModal(false); setBatchNote(''); }} className="btn-outline flex-1">取消</button>
               <button
                 onClick={() => {
                   if (batchAmt > 0 && selectedRenewIds.size > 0) {
-                    batchRenewClasses(Array.from(selectedRenewIds), batchAmt, 'batch');
+                    batchRenewClasses(Array.from(selectedRenewIds), batchAmt, 'batch', batchNote || undefined);
                     setSelectedRenewIds(new Set());
+                    setBatchNote('');
                     setShowBatchModal(false);
                   }
                 }}

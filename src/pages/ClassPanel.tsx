@@ -6,7 +6,7 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { ClassTimer } from '@/components/ui/ClassTimer';
-import { todayISO, formatDateTime, formatDate, addDays, daysSince } from '@/utils/date';
+import { todayISO, formatDateTime, formatDate, addDays, daysSince, isThisWeek, isSameDay, getWeekDay } from '@/utils/date';
 import { cn } from '@/lib/utils';
 import type { ClassSessionStatus, Member } from '@/shared/types';
 
@@ -65,11 +65,21 @@ export default function ClassPanel() {
   );
   const futureScheduled = useMemo(
     () => sessions
-      .filter((s) => s.status === 'scheduled' && +new Date(s.startTime) < tStart)
-      .concat(sessions.filter((s) => s.status === 'scheduled' && +new Date(s.startTime) >= tStart))
-      .sort((a, b) => +new Date(a.startTime) - +new Date(b.startTime))
-      .filter((s) => s.status === 'scheduled' && new Date(s.startTime).getTime() >= tStart - 86400000),
+      .filter((s) => s.status === 'scheduled' && new Date(s.startTime).getTime() >= tStart - 86400000)
+      .sort((a, b) => +new Date(a.startTime) - +new Date(b.startTime)),
     [sessions, tStart]
+  );
+  const todayScheduled = useMemo(
+    () => futureScheduled.filter((s) => isSameDay(s.startTime, today)),
+    [futureScheduled, today]
+  );
+  const weekScheduled = useMemo(
+    () => futureScheduled.filter((s) => isThisWeek(s.startTime) && !isSameDay(s.startTime, today)),
+    [futureScheduled, today]
+  );
+  const futureAfterWeek = useMemo(
+    () => futureScheduled.filter((s) => !isThisWeek(s.startTime)),
+    [futureScheduled]
   );
   const cDone = tSess.filter((s) => s.status === 'completed').length;
   const cGoing = tSess.filter((s) => s.status === 'ongoing').length;
@@ -120,6 +130,11 @@ export default function ClassPanel() {
     const mb = members.find((m) => m.id === s.memberId);
     if (!mb || mb.remainingClasses <= 0) {
       showToast('课时不足，无法开始');
+      return;
+    }
+    const existing = sessions.find((x) => x.status === 'ongoing' && x.coachId === (s.coachId || curCid));
+    if (existing) {
+      showToast('已有进行中的课程，请先结束');
       return;
     }
     setSelId(mb.id);
@@ -279,10 +294,10 @@ export default function ClassPanel() {
               )}
             </>
           ) : (
-            <div className="card p-5">
-              <div className="flex items-center gap-2 mb-5">
+            <div className="card">
+              <div className="flex items-center gap-2 p-5 border-b border-ink-100">
                 <CalendarDays className="w-5 h-5 text-brand-500" />
-                <h2 className="section-title mb-0 text-base">预约新课程</h2>
+                <h2 className="section-title mb-0 text-base">预约日程</h2>
                 <button
                   onClick={() => setShowSch(true)} disabled={!sel || sel.remainingClasses <= 0}
                   className={cn(
@@ -293,48 +308,153 @@ export default function ClassPanel() {
                   <CalendarPlus className="w-4 h-4" />新建预约
                 </button>
               </div>
-              {!sel ? (
-                <div className="py-10 text-center text-ink-400 text-sm">请先在上方选择会员再进行预约</div>
-              ) : futureScheduled.length === 0 ? (
-                <div className="py-10 text-center text-ink-400 text-sm">
-                  <CalendarClock className="w-10 h-10 text-ink-300 mx-auto mb-3" />
-                  暂无预约，点击上方「新建预约」
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {futureScheduled.map((s) => {
-                    const mb = members.find((x) => x.id === s.memberId);
-                    const cb = gCb(s.coachId);
-                    const isToday = new Date(s.startTime).getTime() >= tStart && new Date(s.startTime).getTime() < tStart + 86400000;
-                    const isPast = daysSince(formatDate(s.startTime)) > 0;
-                    return (
-                      <div key={s.id} className={cn(
-                        'p-4 rounded-xl border flex items-center gap-3 transition',
-                        isToday ? 'bg-emerald-50/50 border-success/30' : 'border-ink-100 hover:bg-ink-50/60'
-                      )}>
-                        <div className={cn('w-3 h-3 rounded-full shrink-0', isToday ? 'bg-success animate-pulse' : 'bg-brand-400')} />
-                        <div className={cn('w-11 h-11 rounded-xl flex items-center justify-center font-bold shrink-0', mb ? avC(mb.gender) : 'bg-ink-100 text-ink-500')}>
-                          {mb?.name?.[0] || '?'}
+
+              <div className="p-5 space-y-6 max-h-[620px] overflow-y-auto scrollbar-thin">
+                {futureScheduled.length === 0 ? (
+                  <div className="py-16 text-center">
+                    <CalendarClock className="w-14 h-14 text-ink-200 mx-auto mb-4" />
+                    <p className="text-ink-500 text-sm">暂无预约课程</p>
+                    <p className="text-xs text-ink-400 mt-1">选择会员后点击右上角「新建预约」</p>
+                  </div>
+                ) : (
+                  <>
+                    {todayScheduled.length > 0 && (
+                      <div>
+                        <div className="flex items-center gap-2 mb-3">
+                          <span className="w-2 h-2 rounded-full bg-success animate-pulse" />
+                          <h3 className="font-semibold text-sm text-ink-900">今天</h3>
+                          <span className="badge bg-emerald-50 text-success text-[10px]">{todayScheduled.length} 节</span>
+                          <span className="ml-auto text-[11px] text-ink-400">{formatDate(today, 'MM月DD日')} {getWeekDay(today)}</span>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-sm truncate">{mb?.name || '--'} {isToday && <span className="badge bg-success/15 text-success ml-2 text-[10px]">今日可上课</span>}</p>
-                          <p className="text-xs text-ink-500 mt-0.5">{formatDateTime(s.startTime)} · {cb?.name || '--'}</p>
-                        </div>
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          {isToday && !og && (
-                            <button onClick={() => startFromScheduled(s.id)} className="btn-sm btn-success !px-3">
-                              <Play className="w-3.5 h-3.5" />开始
-                            </button>
-                          )}
-                          <button onClick={() => handleCancelScheduled(s.id)} className="btn-sm btn-outline-danger !px-2" title="取消预约">
-                            <X className="w-3.5 h-3.5" />
-                          </button>
+                        <div className="space-y-2">
+                          {todayScheduled.map((s) => {
+                            const mb = members.find((x) => x.id === s.memberId);
+                            const cb = gCb(s.coachId);
+                            const canStart = !og && mb && mb.remainingClasses > 0;
+                            return (
+                              <div key={s.id} className="p-4 rounded-xl border border-success/30 bg-emerald-50/50 hover:bg-emerald-50 transition">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-12 h-12 rounded-xl bg-white border border-success/30 flex items-center justify-center font-bold text-brand-600 shrink-0">
+                                    {formatDateTime(s.startTime).slice(-5)}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-semibold text-sm truncate">
+                                      {mb?.name || '--'}
+                                      <span className="badge bg-success/15 text-success ml-2 text-[10px]">今日可上课</span>
+                                    </p>
+                                    <p className="text-xs text-ink-500 mt-0.5">{cb?.name || '--'} · 私教课</p>
+                                    {mb && (
+                                      <p className="text-[11px] text-ink-400 mt-0.5">
+                                        剩余 <span className={mb.remainingClasses <= 3 ? 'text-danger font-medium' : 'text-ink-600'}>{mb.remainingClasses}</span> 课时
+                                      </p>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    {canStart ? (
+                                      <button
+                                        onClick={() => startFromScheduled(s.id)}
+                                        className="btn-success !px-3 !py-2 text-sm"
+                                      >
+                                        <Play className="w-4 h-4" />开始
+                                      </button>
+                                    ) : (
+                                      <span className="text-[11px] text-ink-400">
+                                        {og ? '上课中' : '课时不足'}
+                                      </span>
+                                    )}
+                                    <button
+                                      onClick={() => handleCancelScheduled(s.id)}
+                                      className="btn-outline-danger btn-sm !px-2"
+                                      title="取消预约"
+                                    >
+                                      <X className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              )}
+                    )}
+
+                    {weekScheduled.length > 0 && (
+                      <div>
+                        <div className="flex items-center gap-2 mb-3">
+                          <span className="w-2 h-2 rounded-full bg-brand-400" />
+                          <h3 className="font-semibold text-sm text-ink-900">本周</h3>
+                          <span className="badge bg-brand-50 text-brand-500 text-[10px]">{weekScheduled.length} 节</span>
+                          <span className="ml-auto text-[11px] text-ink-400">近期安排</span>
+                        </div>
+                        <div className="space-y-1.5">
+                          {weekScheduled.map((s) => {
+                            const mb = members.find((x) => x.id === s.memberId);
+                            const cb = gCb(s.coachId);
+                            return (
+                              <div key={s.id} className="flex items-center gap-3 p-3 rounded-lg hover:bg-ink-50/70 transition group">
+                                <div className="w-10 h-10 rounded-lg bg-brand-50 border border-brand-100 flex flex-col items-center justify-center shrink-0">
+                                  <span className="text-[10px] text-brand-500 leading-none">{getWeekDay(s.startTime).slice(1)}</span>
+                                  <span className="text-xs font-semibold text-brand-700 mt-0.5">{formatDateTime(s.startTime).slice(-5)}</span>
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium text-sm truncate">{mb?.name || '--'}</p>
+                                  <p className="text-[11px] text-ink-500 truncate">{cb?.name || '--'}</p>
+                                </div>
+                                <button
+                                  onClick={() => handleCancelScheduled(s.id)}
+                                  className="opacity-0 group-hover:opacity-100 text-ink-400 hover:text-danger transition btn-sm btn-outline !px-2"
+                                  title="取消预约"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {futureAfterWeek.length > 0 && (
+                      <div>
+                        <div className="flex items-center gap-2 mb-3">
+                          <span className="w-2 h-2 rounded-full bg-ink-300" />
+                          <h3 className="font-semibold text-sm text-ink-700">未来</h3>
+                          <span className="badge bg-ink-100 text-ink-500 text-[10px]">{futureAfterWeek.length} 节</span>
+                          <span className="ml-auto text-[11px] text-ink-400">下周及以后</span>
+                        </div>
+                        <div className="space-y-1.5">
+                          {futureAfterWeek.slice(0, 10).map((s) => {
+                            const mb = members.find((x) => x.id === s.memberId);
+                            const cb = gCb(s.coachId);
+                            return (
+                              <div key={s.id} className="flex items-center gap-3 p-3 rounded-lg hover:bg-ink-50/70 transition group opacity-80">
+                                <div className="w-10 h-10 rounded-lg bg-ink-50 border border-ink-100 flex flex-col items-center justify-center shrink-0">
+                                  <span className="text-[10px] text-ink-500 leading-none">{formatDate(s.startTime, 'MM/DD')}</span>
+                                  <span className="text-xs font-medium text-ink-600 mt-0.5">{formatDateTime(s.startTime).slice(-5)}</span>
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium text-sm truncate text-ink-700">{mb?.name || '--'}</p>
+                                  <p className="text-[11px] text-ink-500 truncate">{cb?.name || '--'}</p>
+                                </div>
+                                <button
+                                  onClick={() => handleCancelScheduled(s.id)}
+                                  className="opacity-0 group-hover:opacity-100 text-ink-400 hover:text-danger transition btn-sm btn-outline !px-2"
+                                  title="取消预约"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            );
+                          })}
+                          {futureAfterWeek.length > 10 && (
+                            <p className="text-center text-xs text-ink-400 pt-1">还有 {futureAfterWeek.length - 10} 节预约...</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
           )}
         </div>

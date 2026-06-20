@@ -76,7 +76,7 @@ interface AppState {
   updateMember: (id: string, patch: Partial<Member>) => void;
   removeMember: (id: string) => void;
   renewClasses: (memberId: string, extraClasses: number, source?: RenewalRecord['source']) => void;
-  batchRenewClasses: (memberIds: string[], extraClasses: number, source?: RenewalRecord['source']) => void;
+  batchRenewClasses: (memberIds: string[], extraClasses: number, source?: RenewalRecord['source'], note?: string) => void;
 
   addMeasurement: (input: NewMeasurementInput) => BodyMeasurement;
   getMemberMeasurements: (memberId: string) => BodyMeasurement[];
@@ -84,6 +84,7 @@ interface AppState {
   startSession: (memberId: string, coachId?: string, sessionId?: string) => ClassSession;
   endSession: (sessionId: string) => ClassSession | null;
   getOngoingSession: () => ClassSession | undefined;
+  updateSessionNote: (sessionId: string, note: string) => void;
 
   getOrCreatePlan: (memberId: string, weekDay: WeekDay) => TrainingPlan;
   addExerciseToPlan: (input: NewExerciseInput) => PlanExercise;
@@ -105,6 +106,7 @@ interface AppState {
   getSessionsByMember: (memberId: string) => ClassSession[];
   getSessionsByCoach: (coachId: string) => ClassSession[];
   getRenewalRecordsByMember: (memberId: string) => RenewalRecord[];
+  updateRenewalNote: (recordId: string, note: string) => void;
 
   scheduleSession: (memberId: string, scheduledTime: string, coachId?: string) => ClassSession;
   cancelSession: (sessionId: string) => void;
@@ -205,7 +207,7 @@ export const useAppStore = create<AppState>()(
         });
       },
 
-      batchRenewClasses: (memberIds, extraClasses, source) => {
+      batchRenewClasses: (memberIds, extraClasses, source, note) => {
         const members = get().members.map((m) => {
           if (!memberIds.includes(m.id)) return m;
           const totalClasses = m.totalClasses + extraClasses;
@@ -223,6 +225,7 @@ export const useAppStore = create<AppState>()(
           purchaseDate: nowISO(),
           classesPurchased: extraClasses,
           source: source || 'batch',
+          followUpNote: note || undefined,
         }));
         set({
           members,
@@ -339,6 +342,14 @@ export const useAppStore = create<AppState>()(
       getOngoingSession: () =>
         get().sessions.find((s) => s.status === 'ongoing'),
 
+      updateSessionNote: (sessionId, note) => {
+        set({
+          sessions: get().sessions.map((s) =>
+            s.id === sessionId ? { ...s, note } : s
+          ),
+        });
+      },
+
       getOrCreatePlan: (memberId, weekDay) => {
         let plan = get().plans.find((p) => p.memberId === memberId && p.weekDay === weekDay);
         if (plan) return plan;
@@ -442,6 +453,14 @@ export const useAppStore = create<AppState>()(
         get()
           .renewalRecords.filter((r) => r.memberId === memberId)
           .sort((a, b) => new Date(b.purchaseDate).getTime() - new Date(a.purchaseDate).getTime()),
+
+      updateRenewalNote: (recordId, note) => {
+        set({
+          renewalRecords: get().renewalRecords.map((r) =>
+            r.id === recordId ? { ...r, followUpNote: note } : r
+          ),
+        });
+      },
 
       scheduleSession: (memberId, scheduledTime, coachId) => {
         const member = get().getMemberById(memberId);

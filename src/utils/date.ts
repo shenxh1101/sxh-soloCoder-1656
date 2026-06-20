@@ -79,3 +79,26 @@ export const isSameDay = (a: string | Date, b: string | Date): boolean => {
     da.getDate() === db.getDate()
   );
 };
+
+export const startOfWeek = (dateStr: string | Date = new Date()): Date => {
+  const d = new Date(dateStr);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  const monday = new Date(d);
+  monday.setDate(diff);
+  monday.setHours(0, 0, 0, 0);
+  return monday;
+};
+
+export const endOfWeek = (dateStr: string | Date = new Date()): Date => {
+  const start = startOfWeek(dateStr);
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+  end.setHours(23, 59, 59, 999);
+  return end;
+};
+
+export const isThisWeek = (dateStr: string | Date): boolean => {
+  const t = new Date(dateStr).getTime();
+  return t >= startOfWeek().getTime() && t <= endOfWeek().getTime();
+};

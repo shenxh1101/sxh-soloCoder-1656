@@ -12,6 +12,8 @@ import {
   User as UserIcon,
   Sparkles,
   Moon,
+  BookOpen,
+  Calendar,
 } from 'lucide-react';
 import {
   LineChart,
@@ -26,7 +28,7 @@ import {
 } from 'recharts';
 import type { WeekDay, PlanExercise } from '@/shared/types';
 import { useAppStore } from '@/store/useAppStore';
-import { getWeekDay, formatDate, todayISO } from '@/utils/date';
+import { getWeekDay, formatDate, todayISO, formatDateTime } from '@/utils/date';
 import { fmtWeight, fmtBodyFat } from '@/utils/formatters';
 import { cn } from '@/lib/utils';
 
@@ -44,6 +46,8 @@ export default function MemberPortal() {
   const members = useAppStore((s) => s.members);
   const getMemberPlanExercisesByDay = useAppStore((s) => s.getMemberPlanExercisesByDay);
   const getMemberMeasurements = useAppStore((s) => s.getMemberMeasurements);
+  const getSessionsByMember = useAppStore((s) => s.getSessionsByMember);
+  const getCoachById = useAppStore((s) => s.getCoachById);
 
   const [selectedMemberId, setSelectedMemberId] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -51,6 +55,11 @@ export default function MemberPortal() {
 
   const todayWeekDay = getWeekDay(todayISO()) as WeekDay;
   const selectedMember = members.find((m) => m.id === selectedMemberId);
+
+  const memberSessions = useMemo(
+    () => (selectedMember ? getSessionsByMember(selectedMember.id).filter(s => s.status === 'completed') : []),
+    [selectedMember, getSessionsByMember]
+  );
 
   const todayExercises = useMemo(
     () => (selectedMember ? getMemberPlanExercisesByDay(selectedMember.id, todayWeekDay) : []),
@@ -306,13 +315,74 @@ export default function MemberPortal() {
         )}
 
         {activeTab === 'mine' && (
-          <div className="bg-white rounded-3xl shadow-card border border-ink-100 p-8 text-center">
-            <div className="w-24 h-24 mx-auto mb-4 rounded-3xl bg-brand-gradient flex items-center justify-center">
-              <span className="font-display text-white text-3xl font-bold">{selectedMember.name[0]}</span>
+          <div className="space-y-5">
+            <div className="bg-white rounded-3xl shadow-card border border-ink-100 p-6 text-center">
+              <div className="w-20 h-20 mx-auto mb-3 rounded-2xl bg-brand-gradient flex items-center justify-center">
+                <span className="font-display text-white text-2xl font-bold">{selectedMember.name[0]}</span>
+              </div>
+              <h2 className="font-display text-lg font-bold text-ink-900">{selectedMember.name}</h2>
+              <p className="text-sm text-ink-500">{selectedMember.phone}</p>
+              <div className="grid grid-cols-3 gap-3 mt-5">
+                <div className="p-3 rounded-2xl bg-brand-50">
+                  <p className="text-[10px] text-brand-600 font-medium mb-1">总课时</p>
+                  <p className="font-display font-bold text-xl text-brand-700">{selectedMember.totalClasses}</p>
+                </div>
+                <div className="p-3 rounded-2xl bg-accent-50">
+                  <p className="text-[10px] text-accent-600 font-medium mb-1">剩余</p>
+                  <p className="font-display font-bold text-xl text-accent-600">{selectedMember.remainingClasses}</p>
+                </div>
+                <div className="p-3 rounded-2xl bg-emerald-50">
+                  <p className="text-[10px] text-emerald-600 font-medium mb-1">已上</p>
+                  <p className="font-display font-bold text-xl text-emerald-600">{memberSessions.length}</p>
+                </div>
+              </div>
             </div>
-            <h2 className="font-display text-xl font-bold text-ink-900 mb-1">{selectedMember.name}</h2>
-            <p className="text-sm text-ink-500 mb-6">{selectedMember.phone}</p>
-            <p className="text-ink-400 text-sm">更多功能开发中...</p>
+
+            <div className="bg-white rounded-3xl shadow-card border border-ink-100 p-5">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="font-display text-base font-semibold text-ink-900 flex items-center gap-2">
+                    <Calendar className="w-4.5 h-4.5 text-brand-500" />课程记录
+                  </h2>
+                  <p className="text-xs text-ink-500 mt-0.5">已完成 {memberSessions.length} 节私教课</p>
+                </div>
+              </div>
+              {memberSessions.length === 0 ? (
+                <div className="py-8 text-center text-ink-400 text-sm">
+                  <Dumbbell className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                  暂无课程记录
+                </div>
+              ) : (
+                <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1 -mr-1">
+                  {memberSessions.slice(0, 20).map((s) => {
+                    const coach = getCoachById(s.coachId);
+                    return (
+                      <div key={s.id} className="p-3.5 rounded-2xl bg-ink-50/70 border border-ink-100">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-brand-50 border border-brand-100 flex flex-col items-center justify-center shrink-0">
+                            <span className="text-[9px] text-brand-600 leading-none font-medium">{formatDate(s.startTime, 'MM/DD')}</span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm text-ink-900">{coach?.name || '--'} 教练</p>
+                            <p className="text-xs text-ink-500 tabular-nums mt-0.5">
+                              {formatDateTime(s.startTime).slice(-5)} · {s.durationMin} 分 · {s.classesConsumed} 课时
+                            </p>
+                          </div>
+                        </div>
+                        {s.note && (
+                          <div className="mt-3 p-3 rounded-xl bg-white border border-brand-100/60">
+                            <p className="text-[10px] text-brand-700 font-semibold mb-1.5 flex items-center gap-1.5">
+                              <BookOpen className="w-3.5 h-3.5" />课堂小结
+                            </p>
+                            <p className="text-xs text-ink-700 whitespace-pre-wrap leading-relaxed">{s.note}</p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
