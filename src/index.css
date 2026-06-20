@@ -75,9 +75,19 @@ html, body, #root {
            hover:-translate-y-0.5 active:translate-y-0;
   }
 
+  .btn-success {
+    @apply btn bg-success text-white shadow-soft hover:bg-emerald-500
+           hover:-translate-y-0.5 active:translate-y-0;
+  }
+
   .btn-outline {
     @apply btn bg-white text-ink-700 border border-ink-300
            hover:bg-ink-100 hover:border-ink-500;
+  }
+
+  .btn-outline-danger {
+    @apply btn bg-white text-danger border border-red-200
+           hover:bg-red-50 hover:border-red-300;
   }
 
   .btn-ghost {
@@ -86,6 +96,10 @@ html, body, #root {
 
   .btn-danger {
     @apply btn bg-danger text-white hover:bg-red-500;
+  }
+
+  .btn-sm {
+    @apply !py-1.5 !px-3 !text-xs;
   }
 
   .card {

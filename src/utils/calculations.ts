@@ -16,7 +16,7 @@ export const calcBMI = (weightKg: number, heightCm: number): number => {
 };
 
 export const getMemberStatus = (member: Member): MemberStatus => {
-  if (member.lastCheckIn && daysSince(member.lastCheckIn) >= 30 && member.remainingClasses > 0) return 'churned';
+  if (member.lastCheckIn && daysSince(member.lastCheckIn) >= 30) return 'churned';
   if (member.remainingClasses <= 0) return 'inactive';
   if (member.remainingClasses <= 3) return 'warning';
   return 'active';
@@ -25,10 +25,10 @@ export const getMemberStatus = (member: Member): MemberStatus => {
 export const isLowClasses = (member: Member): boolean =>
   member.remainingClasses > 0 && member.remainingClasses <= 3;
 
-export const isChurnRisk = (member: Member): boolean =>
-  member.remainingClasses > 0 &&
-  member.lastCheckIn !== null &&
-  daysSince(member.lastCheckIn) >= 30;
+export const isChurnRisk = (member: Member): boolean => {
+  if (!member.lastCheckIn) return false;
+  return daysSince(member.lastCheckIn) >= 30;
+};
 
 export const getCoachStats = (
   coaches: Coach[],

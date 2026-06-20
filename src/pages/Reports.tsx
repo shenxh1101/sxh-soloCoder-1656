@@ -9,6 +9,7 @@ import {
   RefreshCcw,
   PieChart as PieChartIcon,
   Filter,
+  Receipt,
 } from 'lucide-react';
 import {
   LineChart,
@@ -27,7 +28,7 @@ import { useAppStore } from '@/store/useAppStore';
 import { StatBarChart } from '@/components/ui/StatBarChart';
 import { DataCard } from '@/components/ui/DataCard';
 import { getCoachStats } from '@/utils/calculations';
-import { formatDate, todayISO, addDays, daysSince } from '@/utils/date';
+import { formatDate, formatDateTime, todayISO, addDays, daysSince } from '@/utils/date';
 import { cn } from '@/lib/utils';
 import type { Member } from '@/shared/types';
 
@@ -45,11 +46,15 @@ export default function Reports() {
   const renewalRecords = useAppStore((s) => s.renewalRecords);
   const getCoachById = useAppStore((s) => s.getCoachById);
   const renewClasses = useAppStore((s) => s.renewClasses);
+  const batchRenewClasses = useAppStore((s) => s.batchRenewClasses);
 
   const [rangeKey, setRangeKey] = useState<RangeKey>('month');
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
   const [churnFilter, setChurnFilter] = useState<ChurnFilter>('all');
+  const [selectedRenewIds, setSelectedRenewIds] = useState<Set<string>>(new Set());
+  const [batchAmt, setBatchAmt] = useState(20);
+  const [showBatchModal, setShowBatchModal] = useState(false);
 
   const range = useMemo(() => {
     const today = todayISO();
@@ -110,28 +115,38 @@ export default function Reports() {
       const monthEnd = formatDate(next, 'YYYY-MM-DD');
       const s = new Date(monthStart).getTime();
       const e = new Date(monthEnd + ' 23:59:59').getTime();
-      let expired = 0;
-      members.forEach((m) => {
-        const jt = new Date(m.joinDate).getTime();
-        if (jt >= s && jt <= e) expired++;
-      });
-      const renewed = new Set(
+
+      const renewedMemberIds = new Set(
         renewalRecords
           .filter((r) => {
             const rt = new Date(r.purchaseDate).getTime();
             return rt >= s && rt <= e;
           })
           .map((r) => r.memberId)
-      ).size;
+      );
+      const renewed = renewedMemberIds.size;
+
+      const stillLowEndOfMonth = members.filter(
+        (m) =>
+          !renewedMemberIds.has(m.id) &&
+          m.remainingClasses > 0 &&
+          m.remainingClasses <= 3
+      ).length;
+
+      const expiringTotal = renewed + Math.max(0, stillLowEndOfMonth);
+
       months.push({
         name: formatDate(monthStart, 'MM月'),
-        rate: expired > 0 ? Math.round((renewed / expired) * 100) : 0,
+        rate: expiringTotal > 0 ? Math.round((renewed / expiringTotal) * 100) : 0,
         renewed,
-        expired,
+        expired: expiringTotal,
       });
     }
     return months;
   }, [members, renewalRecords]);
+
+  const totalRenewalCount = renewalRecords.length;
+  const totalRenewalClasses = renewalRecords.reduce((s, r) => s + r.classesPurchased, 0);
 
   const renewalSummary = useMemo(() => {
     const totalRenewed = renewalData.reduce((s, m) => s + m.renewed, 0);
@@ -294,7 +309,7 @@ export default function Reports() {
 
   const renderRenewalTab = () => (
     <div className="space-y-5">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <DataCard
           title="续费率"
           value={`${renewalSummary.rate}%`}
@@ -308,8 +323,14 @@ export default function Reports() {
           color="brand"
         />
         <DataCard
-          title="到期人数"
-          value={renewalSummary.expired}
+          title="续费次数"
+          value={totalRenewalCount}
+          icon={Receipt as typeof TrendingUp}
+          color="accent"
+        />
+        <DataCard
+          title="累计续费课时"
+          value={totalRenewalClasses}
           icon={Users}
           color="warning"
         />
@@ -317,7 +338,7 @@ export default function Reports() {
       <div className="card p-5">
         <div className="mb-4">
           <h3 className="section-title">续费率趋势</h3>
-          <p className="text-sm text-ink-500 mt-0.5">近 6 个月变化，参考线 {RENEWAL_TARGET}%</p>
+          <p className="text-sm text-ink-500 mt-0.5">近 6 个月变化，参考线 {RENEWAL_TARGET}% · 口径：当月续费人数 /（续费人数 + 月底仍待续费人数）</p>
         </div>
         <div className="h-72">
           <ResponsiveContainer width="100%" height="100%">
@@ -356,7 +377,12 @@ export default function Reports() {
                   position: 'right',
                 }}
               />
-              <Tooltip formatter={(v: number) => [`${v}%`, '续费率']} />
+              <Tooltip
+                formatter={(v: number, name) => {
+                  if (name === '续费率') return [`${v}%`, name];
+                  return [v, name];
+                }}
+              />
               <Line
                 type="monotone"
                 dataKey="rate"
@@ -375,22 +401,51 @@ export default function Reports() {
         </div>
       </div>
       <div className="card overflow-hidden">
-        <div className="p-5 border-b border-ink-100">
-          <h3 className="section-title">待续费会员</h3>
-          <p className="text-sm text-ink-500 mt-0.5">剩余课时 ≤ 3</p>
+        <div className="p-5 border-b border-ink-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <h3 className="section-title flex items-center gap-2">
+              待续费会员
+              <span className="badge bg-warning/15 text-warning text-[10px] font-medium">剩余课时 ≤ 3</span>
+            </h3>
+            <p className="text-sm text-ink-500 mt-0.5">
+              {toRenew.length} 人待跟进 · 已选 {selectedRenewIds.size} 人
+            </p>
+          </div>
+          {selectedRenewIds.size > 0 && (
+            <button onClick={() => setShowBatchModal(true)} className="btn-accent">
+              <RefreshCcw className="w-4 h-4" />
+              <span>批量续费 {selectedRenewIds.size} 人</span>
+            </button>
+          )}
         </div>
         {toRenew.length === 0 ? (
-          <div className="p-10 text-center text-ink-500">暂无待续费会员</div>
+          <div className="p-10 text-center text-ink-500">暂无待续费会员 🎉</div>
         ) : (
           <div className="divide-y divide-ink-100">
             {toRenew.map((m) => {
               const coach = getCoachById(m.coachId);
+              const checked = selectedRenewIds.has(m.id);
               return (
                 <div
                   key={m.id}
-                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 hover:bg-ink-50/50"
+                  className={cn(
+                    'flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 hover:bg-ink-50/50',
+                    checked && 'bg-amber-50/40'
+                  )}
                 >
                   <div className="flex items-center gap-3">
+                    <label className="shrink-0 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(e) => {
+                          const n = new Set(selectedRenewIds);
+                          e.target.checked ? n.add(m.id) : n.delete(m.id);
+                          setSelectedRenewIds(n);
+                        }}
+                        className="w-4 h-4 rounded border-ink-300 text-brand-500 focus:ring-brand-400"
+                      />
+                    </label>
                     <div className="w-10 h-10 rounded-xl bg-brand-200 flex items-center justify-center text-brand-600 font-semibold">
                       {m.name[0]}
                     </div>
@@ -408,9 +463,7 @@ export default function Reports() {
                           'font-display font-bold text-lg',
                           m.remainingClasses <= 2
                             ? 'text-danger'
-                            : m.remainingClasses <= 3
-                            ? 'text-warning'
-                            : 'text-ink-900'
+                            : 'text-warning'
                         )}
                       >
                         {m.remainingClasses}
@@ -418,7 +471,7 @@ export default function Reports() {
                       <span className="text-sm text-ink-500 ml-1">剩余</span>
                     </div>
                     <button
-                      onClick={() => renewClasses(m.id, 24)}
+                      onClick={() => renewClasses(m.id, 24, 'reports')}
                       className="btn-primary !py-2 !px-3"
                     >
                       <RefreshCcw className="w-4 h-4" />
@@ -431,6 +484,105 @@ export default function Reports() {
           </div>
         )}
       </div>
+      <div className="card overflow-hidden">
+        <div className="p-5 border-b border-ink-100">
+          <h3 className="section-title flex items-center gap-2">
+            <Receipt className="w-4 h-4 text-brand-500" />
+            续费记录明细
+            <span className="ml-auto text-xs font-normal text-ink-500">共 {renewalRecords.length} 条记录 · {totalRenewalClasses} 课时</span>
+          </h3>
+        </div>
+        {renewalRecords.length === 0 ? (
+          <div className="p-10 text-center text-ink-500">暂无续费记录</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px]">
+              <thead className="bg-ink-50">
+                <tr>
+                  {['会员', '续费时间', '课时数', '入口', '教练'].map((h) => (
+                    <th key={h} className="px-5 py-3 text-left text-xs font-semibold text-ink-500 uppercase tracking-wider">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-ink-100">
+                {[...renewalRecords]
+                  .sort((a, b) => new Date(b.purchaseDate).getTime() - new Date(a.purchaseDate).getTime())
+                  .slice(0, 50)
+                  .map((r) => {
+                    const mb = members.find((x) => x.id === r.memberId);
+                    const cb = mb ? getCoachById(mb.coachId) : undefined;
+                    return (
+                      <tr key={r.id} className="hover:bg-ink-50/50">
+                        <td className="px-5 py-3">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-lg bg-brand-100 text-brand-600 flex items-center justify-center font-semibold text-xs">
+                              {mb?.name?.[0] || '?'}
+                            </div>
+                            <span className="font-medium text-ink-900 text-sm">{mb?.name || '已删除会员'}</span>
+                          </div>
+                        </td>
+                        <td className="px-5 py-3 text-sm text-ink-700 tabular-nums">{formatDateTime(r.purchaseDate)}</td>
+                        <td className="px-5 py-3">
+                          <span className="badge bg-emerald-50 text-success font-semibold">+{r.classesPurchased}</span>
+                        </td>
+                        <td className="px-5 py-3">
+                          <span className="badge bg-ink-100 text-ink-600 text-[10px]">
+                            {r.source === 'dashboard' ? '仪表盘' :
+                             r.source === 'member_detail' ? '会员详情' :
+                             r.source === 'reports' ? '统计报表' :
+                             r.source === 'batch' ? '批量续费' : '手动'}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3 text-sm text-ink-600">{cb?.name || '—'}</td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+      {showBatchModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in" onClick={() => setShowBatchModal(false)}>
+          <div className="card p-5 w-full max-w-md animate-fade-up" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-base font-bold text-ink-900 mb-3 flex items-center gap-2">
+              <RefreshCcw className="w-4.5 h-4.5 text-brand-500" />
+              批量续费 {selectedRenewIds.size} 人
+            </h3>
+            <p className="text-sm text-ink-600 mb-4">
+              共 <span className="font-bold text-brand-600">{selectedRenewIds.size}</span> 位会员，每人续费 <span className="font-bold text-brand-600">{batchAmt}</span> 课时
+            </p>
+            <div className="mb-4">
+              <label className="input-label">每人续费数量</label>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setBatchAmt((a) => Math.max(1, a - 5))} className="btn-outline w-9">-5</button>
+                <input type="number" value={batchAmt} onChange={(e) => setBatchAmt(Math.max(0, parseInt(e.target.value) || 0))} className="input-base text-center flex-1 font-bold text-lg" />
+                <button onClick={() => setBatchAmt((a) => a + 5)} className="btn-outline w-9">+5</button>
+              </div>
+              <div className="flex gap-2 mt-2">
+                {[10, 20, 30, 50].map((n) => (
+                  <button key={n} onClick={() => setBatchAmt(n)} className={cn('flex-1 py-1 rounded-lg text-xs font-medium', batchAmt === n ? 'bg-brand-500 text-white' : 'bg-ink-50 text-ink-600 hover:bg-ink-100')}>{n}节</button>
+                ))}
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => setShowBatchModal(false)} className="btn-outline flex-1">取消</button>
+              <button
+                onClick={() => {
+                  if (batchAmt > 0 && selectedRenewIds.size > 0) {
+                    batchRenewClasses(Array.from(selectedRenewIds), batchAmt, 'batch');
+                    setSelectedRenewIds(new Set());
+                    setShowBatchModal(false);
+                  }
+                }}
+                className="btn-primary flex-1"
+              >
+                确认 +{batchAmt}×{selectedRenewIds.size}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 

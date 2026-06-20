@@ -75,12 +75,13 @@ interface AppState {
   addMember: (input: NewMemberInput) => Member;
   updateMember: (id: string, patch: Partial<Member>) => void;
   removeMember: (id: string) => void;
-  renewClasses: (memberId: string, extraClasses: number) => void;
+  renewClasses: (memberId: string, extraClasses: number, source?: RenewalRecord['source']) => void;
+  batchRenewClasses: (memberIds: string[], extraClasses: number, source?: RenewalRecord['source']) => void;
 
   addMeasurement: (input: NewMeasurementInput) => BodyMeasurement;
   getMemberMeasurements: (memberId: string) => BodyMeasurement[];
 
-  startSession: (memberId: string, coachId?: string) => ClassSession;
+  startSession: (memberId: string, coachId?: string, sessionId?: string) => ClassSession;
   endSession: (sessionId: string) => ClassSession | null;
   getOngoingSession: () => ClassSession | undefined;
 
@@ -103,6 +104,10 @@ interface AppState {
   getMembersByCoach: (coachId: string) => Member[];
   getSessionsByMember: (memberId: string) => ClassSession[];
   getSessionsByCoach: (coachId: string) => ClassSession[];
+  getRenewalRecordsByMember: (memberId: string) => RenewalRecord[];
+
+  scheduleSession: (memberId: string, scheduledTime: string, coachId?: string) => ClassSession;
+  cancelSession: (sessionId: string) => void;
 
   acknowledgeAllAlerts: () => void;
 
@@ -175,7 +180,7 @@ export const useAppStore = create<AppState>()(
         });
       },
 
-      renewClasses: (memberId, extraClasses) => {
+      renewClasses: (memberId, extraClasses, source) => {
         const members = get().members.map((m) => {
           if (m.id !== memberId) return m;
           const totalClasses = m.totalClasses + extraClasses;
@@ -190,12 +195,38 @@ export const useAppStore = create<AppState>()(
         const record: RenewalRecord = {
           id: genUUID(),
           memberId,
-          purchaseDate: todayISO(),
+          purchaseDate: nowISO(),
           classesPurchased: extraClasses,
+          source: source || 'member_detail',
         };
         set({
           members,
           renewalRecords: [...get().renewalRecords, record],
+        });
+      },
+
+      batchRenewClasses: (memberIds, extraClasses, source) => {
+        const members = get().members.map((m) => {
+          if (!memberIds.includes(m.id)) return m;
+          const totalClasses = m.totalClasses + extraClasses;
+          const remainingClasses = m.remainingClasses + extraClasses;
+          return {
+            ...m,
+            totalClasses,
+            remainingClasses,
+            status: getMemberStatus({ ...m, totalClasses, remainingClasses }),
+          };
+        });
+        const records: RenewalRecord[] = memberIds.map((mid) => ({
+          id: genUUID(),
+          memberId: mid,
+          purchaseDate: nowISO(),
+          classesPurchased: extraClasses,
+          source: source || 'batch',
+        }));
+        set({
+          members,
+          renewalRecords: [...get().renewalRecords, ...records],
         });
       },
 
@@ -224,7 +255,7 @@ export const useAppStore = create<AppState>()(
           .measurements.filter((m) => m.memberId === memberId)
           .sort((a, b) => new Date(b.measureDate).getTime() - new Date(a.measureDate).getTime()),
 
-      startSession: (memberId, coachId) => {
+      startSession: (memberId, coachId, sessionId) => {
         const member = get().getMemberById(memberId);
         if (!member || member.remainingClasses <= 0) return null as unknown as ClassSession;
         const cid = coachId || get().currentCoachId;
@@ -233,6 +264,25 @@ export const useAppStore = create<AppState>()(
         );
         if (existingOngoing) {
           return existingOngoing;
+        }
+        if (sessionId) {
+          let promoted: ClassSession | null = null;
+          const sessions = get().sessions.map((s) => {
+            if (s.id !== sessionId) return s;
+            if (s.status !== 'scheduled') return s;
+            promoted = {
+              ...s,
+              startTime: nowISO(),
+              status: 'ongoing' as const,
+              classesConsumed: 0,
+              durationMin: 0,
+            };
+            return promoted;
+          });
+          if (promoted) {
+            set({ sessions, activeSessionId: promoted.id });
+            return promoted;
+          }
         }
         const session: ClassSession = {
           id: genUUID(),
@@ -387,6 +437,37 @@ export const useAppStore = create<AppState>()(
         get()
           .sessions.filter((s) => s.coachId === coachId)
           .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()),
+
+      getRenewalRecordsByMember: (memberId) =>
+        get()
+          .renewalRecords.filter((r) => r.memberId === memberId)
+          .sort((a, b) => new Date(b.purchaseDate).getTime() - new Date(a.purchaseDate).getTime()),
+
+      scheduleSession: (memberId, scheduledTime, coachId) => {
+        const member = get().getMemberById(memberId);
+        if (!member || member.remainingClasses <= 0) return null as unknown as ClassSession;
+        const cid = coachId || get().currentCoachId;
+        const session: ClassSession = {
+          id: genUUID(),
+          memberId,
+          coachId: cid,
+          startTime: scheduledTime,
+          durationMin: 0,
+          classesConsumed: 0,
+          status: 'scheduled',
+        };
+        set({ sessions: [...get().sessions, session] });
+        return session;
+      },
+
+      cancelSession: (sessionId) => {
+        const sessions = get().sessions.map((s) => {
+          if (s.id !== sessionId) return s;
+          if (s.status !== 'scheduled') return s;
+          return { ...s, status: 'cancelled' as const };
+        });
+        set({ sessions });
+      },
 
       acknowledgeAllAlerts: () => {},
 

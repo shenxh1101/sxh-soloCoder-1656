@@ -84,6 +84,7 @@ export interface RenewalRecord {
   purchaseDate: string;
   classesPurchased: number;
   amount?: number;
+  source?: 'dashboard' | 'member_detail' | 'reports' | 'batch';
 }
 
 export interface AlertItem {

@@ -84,7 +84,7 @@ export default function Dashboard() {
   const handleStart = (sid: string) => {
     const s = sessions.find((x) => x.id === sid);
     const mb = s ? getMemberById(s.memberId) : undefined;
-    if (s?.status === 'scheduled' && mb && mb.remainingClasses > 0) startSession(s.memberId, s.coachId);
+    if (s?.status === 'scheduled' && mb && mb.remainingClasses > 0) startSession(s.memberId, s.coachId, s.id);
   };
 
   return (
@@ -123,7 +123,7 @@ export default function Dashboard() {
                     </div>
                   </div>
                   <button
-                    onClick={() => renewClasses(m.id, 24)}
+                    onClick={() => renewClasses(m.id, 24, 'dashboard')}
                     className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium bg-brand-50 text-brand-600 hover:bg-brand-100 transition-all"
                   >
                     +24 课时

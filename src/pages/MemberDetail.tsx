@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft, Play, CreditCard, Activity,
-  Scale, Flame, Target, Trash2, Plus,
+  Scale, Flame, Target, Trash2, Plus, History, Receipt,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { BodyChart } from '@/components/ui/BodyChart';
@@ -21,6 +21,7 @@ const TABS: { id: string; label: string; icon: LucideIcon }[] = [
   { id: 'measurements', label: '体测记录', icon: Activity },
   { id: 'sessions', label: '课程历史', icon: Target },
   { id: 'plan', label: '训练计划', icon: Flame },
+  { id: 'renewals', label: '续费记录', icon: Receipt },
 ];
 
 const WDS: { id: WeekDay; label: string }[] = [
@@ -57,6 +58,9 @@ export default function MemberDetail() {
   const sS = useAppStore((s) => s.startSession);
   const aM = useAppStore((s) => s.addMeasurement);
   const sessions = useAppStore((s) => s.sessions);
+  const gRM = useAppStore((s) => s.getRenewalRecordsByMember);
+  const renewalRecords = useMemo(() => gRM(id), [id, gRM]);
+  const totalRenewedClasses = renewalRecords.reduce((s, r) => s + r.classesPurchased, 0);
 
   const [tab, setTab] = useState('measurements');
   const [dTab, setDTab] = useState<WeekDay>(getWeekDay() as WeekDay);
@@ -206,6 +210,56 @@ export default function MemberDetail() {
               <PlanDayEditor memberId={m.id} weekDay={dTab} />
             </div>
           )}
+          {tab === 'renewals' && (
+            <div>
+              <div className="grid grid-cols-3 gap-2.5 mb-4">
+                <div className="rounded-lg bg-brand-50 border border-brand-100 p-3 text-center">
+                  <p className="text-[10px] text-brand-600 font-medium mb-1">续费次数</p>
+                  <p className="font-display font-bold text-2xl text-brand-700">{renewalRecords.length}</p>
+                </div>
+                <div className="rounded-lg bg-accent-50 border border-accent-100 p-3 text-center">
+                  <p className="text-[10px] text-accent-600 font-medium mb-1">累计续费课时</p>
+                  <p className="font-display font-bold text-2xl text-accent-600">+{totalRenewedClasses}</p>
+                </div>
+                <div className="rounded-lg bg-ink-50 border border-ink-100 p-3 text-center">
+                  <p className="text-[10px] text-ink-500 font-medium mb-1">历史总课时</p>
+                  <p className="font-display font-bold text-2xl text-ink-900">{m.totalClasses}</p>
+                </div>
+              </div>
+              {renewalRecords.length === 0 ? (
+                <div className="py-12 text-center text-ink-500 text-sm">
+                  <History className="w-10 h-10 text-ink-300 mx-auto mb-3" />
+                  暂无续费记录
+                </div>
+              ) : (
+                <div className="overflow-x-auto rounded-xl border border-ink-100">
+                  <table className="w-full text-sm">
+                    <thead className="bg-ink-50"><tr className="text-xs text-ink-500">
+                      <th className="text-left px-3 py-2 font-medium">续费时间</th>
+                      <th className="text-right px-3 py-2 font-medium">续费课时</th>
+                      <th className="text-left px-3 py-2 font-medium">操作入口</th>
+                    </tr></thead>
+                    <tbody>{renewalRecords.map((r) => (
+                      <tr key={r.id} className="border-t border-ink-100 hover:bg-ink-50/50">
+                        <td className="px-3 py-2.5 text-ink-700 tabular-nums">{formatDateTime(r.purchaseDate)}</td>
+                        <td className="px-3 py-2.5 text-right">
+                          <span className="badge bg-emerald-50 text-success font-semibold">+{r.classesPurchased}</span>
+                        </td>
+                        <td className="px-3 py-2.5">
+                          <span className="badge bg-ink-100 text-ink-600">{
+                            r.source === 'dashboard' ? '仪表盘快捷续费' :
+                            r.source === 'member_detail' ? '会员详情页' :
+                            r.source === 'reports' ? '统计报表' :
+                            r.source === 'batch' ? '批量续费' : '手动续费'
+                          }</span>
+                        </td>
+                      </tr>
+                    ))}</tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -236,7 +290,7 @@ export default function MemberDetail() {
             </div>
             <div className="flex gap-2">
               <button onClick={() => setShowR(false)} className="btn-outline flex-1">取消</button>
-              <button onClick={() => { if (amt > 0) { rC(m.id, amt); setShowR(false); } }} className="btn-primary flex-1">确认 +{amt}</button>
+              <button onClick={() => { if (amt > 0) { rC(m.id, amt, 'member_detail'); setShowR(false); } }} className="btn-primary flex-1">确认 +{amt}</button>
             </div>
           </div>
         </div>
