@@ -238,7 +238,7 @@ export default function MemberPortal() {
                         </span>
                         <span className="chip bg-accent-100 text-accent-700">
                           <Weight className="w-3 h-3 mr-1" />
-                          {ex.weight} kg
+                          {ex.weightKg ?? 0} kg
                         </span>
                         <span className="chip bg-ink-200 text-ink-700">休息 {ex.restSec}s</span>
                       </div>

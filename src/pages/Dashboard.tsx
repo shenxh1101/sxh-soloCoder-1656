@@ -63,8 +63,10 @@ export default function Dashboard() {
     [coaches, members, sessions]
   );
 
-  const lowMembers = useMemo(() => members.filter(isLowClasses).slice(0, 5), [members]);
-  const churnMembers = useMemo(() => members.filter(isChurnRisk).slice(0, 5), [members]);
+  const lowMembers = useMemo(() => members.filter(isLowClasses), [members]);
+  const churnMembers = useMemo(() => members.filter(isChurnRisk), [members]);
+  const churnMemberList = churnMembers.slice(0, 5);
+  const lowMemberList = lowMembers.slice(0, 5);
 
   const todayTimeline = useMemo(() => {
     let list = sessions.filter((s) => isSameDay(s.startTime, today) || s.status === 'ongoing');
@@ -107,11 +109,11 @@ export default function Dashboard() {
               <p className="text-xs text-ink-500">共 {lowMembers.length} 人</p>
             </div>
           </div>
-          {lowMembers.length === 0 ? (
-            <div className="py-8 text-center text-ink-500 text-sm">暂无预警</div>
+          {lowMemberList.length === 0 ? (
+            <div className="py-8 text-center text-ink-500 text-sm">暂无提醒</div>
           ) : (
             <div className="space-y-1.5">
-              {lowMembers.map((m) => (
+              {lowMemberList.map((m) => (
                 <div key={m.id} className="flex items-center justify-between p-3 rounded-lg hover:bg-ink-50">
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="w-9 h-9 rounded-full bg-gradient-to-br from-brand-400 to-accent-400 flex items-center justify-center text-white text-sm font-semibold shrink-0">
@@ -144,11 +146,11 @@ export default function Dashboard() {
               <p className="text-xs text-ink-500">共 {churnMembers.length} 人</p>
             </div>
           </div>
-          {churnMembers.length === 0 ? (
-            <div className="py-8 text-center text-ink-500 text-sm">暂无预警</div>
+          {churnMemberList.length === 0 ? (
+            <div className="py-8 text-center text-ink-500 text-sm">暂无流失风险会员</div>
           ) : (
             <div className="space-y-1.5">
-              {churnMembers.map((m) => (
+              {churnMemberList.map((m) => (
                 <div key={m.id} className="flex items-center justify-between p-3 rounded-lg hover:bg-ink-50">
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="w-9 h-9 rounded-full bg-gradient-to-br from-brand-400 to-accent-400 flex items-center justify-center text-white text-sm font-semibold shrink-0">

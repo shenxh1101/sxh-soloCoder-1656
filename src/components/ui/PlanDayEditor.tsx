@@ -13,7 +13,7 @@ interface EditingState {
   name: string;
   sets: number;
   reps: number;
-  weight: number;
+  weightKg: number;
   restSec: number;
 }
 
@@ -21,7 +21,7 @@ const defaultExercise: EditingState = {
   name: '',
   sets: 4,
   reps: 12,
-  weight: 0,
+  weightKg: 0,
   restSec: 60,
 };
 
@@ -48,7 +48,7 @@ export function PlanDayEditor({ memberId, weekDay }: PlanDayEditorProps) {
       name: newEx.name.trim(),
       sets: newEx.sets,
       reps: newEx.reps,
-      weight: newEx.weight,
+      weightKg: newEx.weightKg,
       restSec: newEx.restSec,
     });
     setNewEx(defaultExercise);
@@ -140,8 +140,8 @@ export function PlanDayEditor({ memberId, weekDay }: PlanDayEditorProps) {
                 type="number"
                 min={0}
                 step={0.5}
-                value={newEx.weight}
-                onChange={(e) => setNewEx({ ...newEx, weight: Math.max(0, Number(e.target.value) || 0) })}
+                value={newEx.weightKg}
+                onChange={(e) => setNewEx({ ...newEx, weightKg: Math.max(0, Number(e.target.value) || 0) })}
                 className="input-base"
               />
             </div>
@@ -242,8 +242,8 @@ export function PlanDayEditor({ memberId, weekDay }: PlanDayEditorProps) {
                     type="number"
                     min={0}
                     step={0.5}
-                    value={ex.weight}
-                    onChange={(e) => handleUpdate(ex.id, { weight: Math.max(0, Number(e.target.value) || 0) })}
+                    value={ex.weightKg ?? 0}
+                    onChange={(e) => handleUpdate(ex.id, { weightKg: Math.max(0, Number(e.target.value) || 0) })}
                     className="w-full px-2 py-1.5 rounded-md bg-white border border-ink-200 text-sm font-semibold text-ink-900 text-right focus:outline-none focus:ring-2 focus:ring-brand-200"
                   />
                   <span className="ml-1.5 text-xs text-ink-500 font-medium">kg</span>

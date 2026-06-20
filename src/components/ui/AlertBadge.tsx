@@ -17,14 +17,14 @@ const typeConfig: Record<AlertBadgeType, {
   ringCls: string;
 }> = {
   low: {
-    label: '课时预警',
+    label: '低课时提醒',
     dotCls: 'bg-warning',
     bgCls: 'bg-amber-50 border-amber-200',
     textCls: 'text-amber-700',
     ringCls: 'animate-pulse-ring-warning',
   },
   churn: {
-    label: '流失预警',
+    label: '流失风险',
     dotCls: 'bg-danger',
     bgCls: 'bg-red-50 border-red-200',
     textCls: 'text-red-700',

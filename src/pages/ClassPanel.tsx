@@ -90,14 +90,33 @@ export default function ClassPanel() {
     setTimeout(() => setToast(null), 2500);
   };
   const handleStart = (sessionId?: string) => {
-    if (!sel || sel.remainingClasses <= 0) return;
     if (sessionId) {
       const s = sessions.find((x) => x.id === sessionId);
       if (s) {
+        const mb = members.find((m) => m.id === s.memberId);
+        if (!mb || mb.remainingClasses <= 0) {
+          showToast('课时不足，无法开始');
+          return;
+        }
+        const existing = sessions.find((x) => x.status === 'ongoing' && x.coachId === (s.coachId || curCid));
+        if (existing) {
+          showToast('已有进行中的课程，请先结束');
+          return;
+        }
         stSs(s.memberId, s.coachId, sessionId);
-        showToast(`${sel.name} 的预约课程已开始`);
+        setSelId(s.memberId);
+        showToast(`${mb.name} 的预约课程已开始`);
         return;
       }
+    }
+    if (!sel || sel.remainingClasses <= 0) {
+      showToast(sel ? '课时不足，无法开始' : '请先选择会员');
+      return;
+    }
+    const conflict = sessions.find((x) => x.status === 'ongoing' && x.coachId === curCid);
+    if (conflict) {
+      showToast('已有进行中的课程，请先结束');
+      return;
     }
     stSs(sel.id, curCid);
     showToast(`${sel.name} 的课程已开始`);
@@ -125,19 +144,6 @@ export default function ClassPanel() {
     showToast('预约已取消');
   };
   const startFromScheduled = (sId: string) => {
-    const s = sessions.find((x) => x.id === sId);
-    if (!s) return;
-    const mb = members.find((m) => m.id === s.memberId);
-    if (!mb || mb.remainingClasses <= 0) {
-      showToast('课时不足，无法开始');
-      return;
-    }
-    const existing = sessions.find((x) => x.status === 'ongoing' && x.coachId === (s.coachId || curCid));
-    if (existing) {
-      showToast('已有进行中的课程，请先结束');
-      return;
-    }
-    setSelId(mb.id);
     handleStart(sId);
   };
 

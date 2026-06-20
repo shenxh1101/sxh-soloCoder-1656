@@ -52,6 +52,7 @@ export interface ClassSession {
   memberId: UUID;
   coachId: UUID;
   startTime: string;
+  endTime?: string;
   durationMin: number;
   classesConsumed: number;
   status: ClassSessionStatus;
@@ -64,6 +65,7 @@ export interface TrainingPlan {
   coachId: UUID;
   weekDay: WeekDay;
   createdAt: string;
+  active: boolean;
 }
 
 export interface PlanExercise {
@@ -71,9 +73,9 @@ export interface PlanExercise {
   planId: UUID;
   name: string;
   sets: number;
-  reps: string;
+  reps: number;
   weightKg?: number;
-  restSeconds?: number;
+  restSec: number;
   note?: string;
   sortOrder: number;
 }

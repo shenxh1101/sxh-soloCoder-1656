@@ -54,7 +54,7 @@ interface NewExerciseInput {
   name: string;
   sets: number;
   reps: number;
-  weight: number;
+  weightKg?: number;
   restSec: number;
   note?: string;
 }
@@ -353,10 +353,13 @@ export const useAppStore = create<AppState>()(
       getOrCreatePlan: (memberId, weekDay) => {
         let plan = get().plans.find((p) => p.memberId === memberId && p.weekDay === weekDay);
         if (plan) return plan;
+        const member = get().getMemberById(memberId);
         plan = {
           id: genUUID(),
           memberId,
+          coachId: member?.coachId || get().currentCoachId,
           weekDay,
+          createdAt: todayISO(),
           active: true,
         };
         set({ plans: [...get().plans, plan] });
@@ -371,7 +374,7 @@ export const useAppStore = create<AppState>()(
           name: input.name,
           sets: input.sets,
           reps: input.reps,
-          weight: input.weight,
+          weightKg: input.weightKg,
           restSec: input.restSec,
           note: input.note,
           sortOrder: existing.length,

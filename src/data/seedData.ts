@@ -194,26 +194,28 @@ const weekDays: ('周一' | '周二' | '周三' | '周四' | '周五' | '周六'
 ];
 
 const exercises = [
-  { name: '深蹲', sets: 4, reps: 12, weight: 60, restSec: 90 },
-  { name: '硬拉', sets: 4, reps: 10, weight: 80, restSec: 120 },
-  { name: '卧推', sets: 4, reps: 10, weight: 50, restSec: 90 },
-  { name: '引体向上', sets: 3, reps: 8, weight: 0, restSec: 90 },
-  { name: '坐姿划船', sets: 3, reps: 12, weight: 40, restSec: 60 },
-  { name: '杠铃推举', sets: 3, reps: 10, weight: 30, restSec: 75 },
-  { name: '保加利亚分腿蹲', sets: 3, reps: 12, weight: 20, restSec: 60 },
-  { name: '平板支撑', sets: 3, reps: 1, weight: 0, restSec: 45 },
-  { name: '卷腹', sets: 3, reps: 20, weight: 0, restSec: 30 },
-  { name: '高位下拉', sets: 3, reps: 12, weight: 35, restSec: 60 },
+  { name: '深蹲', sets: 4, reps: 12, weightKg: 60, restSec: 90 },
+  { name: '硬拉', sets: 4, reps: 10, weightKg: 80, restSec: 120 },
+  { name: '卧推', sets: 4, reps: 10, weightKg: 50, restSec: 90 },
+  { name: '引体向上', sets: 3, reps: 8, weightKg: 0, restSec: 90 },
+  { name: '坐姿划船', sets: 3, reps: 12, weightKg: 40, restSec: 60 },
+  { name: '杠铃推举', sets: 3, reps: 10, weightKg: 30, restSec: 75 },
+  { name: '保加利亚分腿蹲', sets: 3, reps: 12, weightKg: 20, restSec: 60 },
+  { name: '平板支撑', sets: 3, reps: 1, weightKg: 0, restSec: 45 },
+  { name: '卷腹', sets: 3, reps: 20, weightKg: 0, restSec: 30 },
+  { name: '高位下拉', sets: 3, reps: 12, weightKg: 35, restSec: 60 },
 ];
 
 export const seedPlans: TrainingPlan[] = [];
 export const seedPlanExercises: PlanExercise[] = [];
 
-const mkPlanFor = (memberId: string, dayIdx: number, exRange: [number, number]) => {
+const mkPlanFor = (memberId: string, coachId: string, dayIdx: number, exRange: [number, number]) => {
   const plan: TrainingPlan = {
     id: genUUID(),
     memberId,
+    coachId,
     weekDay: weekDays[dayIdx],
+    createdAt: todayISO(),
     active: true,
   };
   seedPlans.push(plan);
@@ -225,25 +227,25 @@ const mkPlanFor = (memberId: string, dayIdx: number, exRange: [number, number]) 
       name: ex.name,
       sets: ex.sets,
       reps: ex.reps,
-      weight: ex.weight,
+      weightKg: ex.weightKg,
       restSec: ex.restSec,
       sortOrder: i - exRange[0],
     });
   }
 };
 
-mkPlanFor(mIds[0], 1, [0, 4]);
-mkPlanFor(mIds[0], 3, [4, 8]);
-mkPlanFor(mIds[0], 5, [2, 6]);
+mkPlanFor(mIds[0], seedMembers[0].coachId, 1, [0, 4]);
+mkPlanFor(mIds[0], seedMembers[0].coachId, 3, [4, 8]);
+mkPlanFor(mIds[0], seedMembers[0].coachId, 5, [2, 6]);
 
-mkPlanFor(mIds[1], 1, [5, 9]);
-mkPlanFor(mIds[1], 4, [0, 4]);
-mkPlanFor(mIds[1], 6, [6, 10]);
+mkPlanFor(mIds[1], seedMembers[1].coachId, 1, [5, 9]);
+mkPlanFor(mIds[1], seedMembers[1].coachId, 4, [0, 4]);
+mkPlanFor(mIds[1], seedMembers[1].coachId, 6, [6, 10]);
 
-mkPlanFor(mIds[2], 1, [0, 5]);
-mkPlanFor(mIds[2], 3, [5, 10]);
-mkPlanFor(mIds[2], 5, [0, 4]);
+mkPlanFor(mIds[2], seedMembers[2].coachId, 1, [0, 5]);
+mkPlanFor(mIds[2], seedMembers[2].coachId, 3, [5, 10]);
+mkPlanFor(mIds[2], seedMembers[2].coachId, 5, [0, 4]);
 
-mkPlanFor(mIds[6], 2, [0, 4]);
-mkPlanFor(mIds[6], 4, [4, 8]);
-mkPlanFor(mIds[6], 6, [2, 7]);
+mkPlanFor(mIds[6], seedMembers[6].coachId, 2, [0, 4]);
+mkPlanFor(mIds[6], seedMembers[6].coachId, 4, [4, 8]);
+mkPlanFor(mIds[6], seedMembers[6].coachId, 6, [2, 7]);

@@ -643,7 +643,7 @@ export default function Reports() {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
               <h3 className="section-title flex items-center gap-2">
                 <Filter className="w-4 h-4 text-brand-500" />
-                流失筛选
+                流失风险筛选
               </h3>
               <div className="flex flex-wrap gap-2">
                 {(
@@ -763,7 +763,7 @@ export default function Reports() {
   const tabs: { k: ReportTab; label: string; icon: typeof CalendarDays }[] = [
     { k: 'coach', label: '教练课时', icon: CalendarDays },
     { k: 'renewal', label: '续费率', icon: RefreshCcw },
-    { k: 'churn', label: '流失预警', icon: AlertTriangle },
+    { k: 'churn', label: '流失风险', icon: AlertTriangle },
   ];
 
   return (

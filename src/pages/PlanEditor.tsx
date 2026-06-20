@@ -79,7 +79,7 @@ export default function PlanEditor() {
           name: ex.name,
           sets: ex.sets,
           reps: ex.reps,
-          weight: ex.weight,
+          weightKg: ex.weightKg,
           restSec: ex.restSec,
         });
       });
@@ -108,7 +108,7 @@ export default function PlanEditor() {
           lines.push('  暂无动作');
         } else {
           exercises.forEach((ex, i) => {
-            lines.push(`  ${i + 1}. ${ex.name} | ${ex.sets}组×${ex.reps}次 | ${ex.weight}kg | 休息${ex.restSec}s`);
+            lines.push(`  ${i + 1}. ${ex.name} | ${ex.sets}组×${ex.reps}次 | ${ex.weightKg ?? 0}kg | 休息${ex.restSec}s`);
           });
         }
       }
