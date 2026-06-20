@@ -42,6 +42,7 @@ export default function Reports() {
   const coaches = useAppStore((s) => s.coaches);
   const members = useAppStore((s) => s.members);
   const sessions = useAppStore((s) => s.sessions);
+  const renewalRecords = useAppStore((s) => s.renewalRecords);
   const getCoachById = useAppStore((s) => s.getCoachById);
   const renewClasses = useAppStore((s) => s.renewClasses);
 
@@ -107,17 +108,21 @@ export default function Reports() {
       const monthStart = formatDate(d, 'YYYY-MM-DD');
       const next = new Date(d.getFullYear(), d.getMonth() + 1, 0);
       const monthEnd = formatDate(next, 'YYYY-MM-DD');
+      const s = new Date(monthStart).getTime();
+      const e = new Date(monthEnd + ' 23:59:59').getTime();
       let expired = 0;
-      let renewed = 0;
       members.forEach((m) => {
         const jt = new Date(m.joinDate).getTime();
-        const s = new Date(monthStart).getTime();
-        const e = new Date(monthEnd + ' 23:59:59').getTime();
-        if (jt >= s && jt <= e) {
-          expired++;
-          if (m.totalClasses > 0 && m.remainingClasses < m.totalClasses) renewed++;
-        }
+        if (jt >= s && jt <= e) expired++;
       });
+      const renewed = new Set(
+        renewalRecords
+          .filter((r) => {
+            const rt = new Date(r.purchaseDate).getTime();
+            return rt >= s && rt <= e;
+          })
+          .map((r) => r.memberId)
+      ).size;
       months.push({
         name: formatDate(monthStart, 'MM月'),
         rate: expired > 0 ? Math.round((renewed / expired) * 100) : 0,
@@ -126,7 +131,7 @@ export default function Reports() {
       });
     }
     return months;
-  }, [members]);
+  }, [members, renewalRecords]);
 
   const renewalSummary = useMemo(() => {
     const totalRenewed = renewalData.reduce((s, m) => s + m.renewed, 0);
@@ -138,7 +143,7 @@ export default function Reports() {
   const toRenew = useMemo(
     () =>
       members
-        .filter((m) => m.remainingClasses > 0 && m.remainingClasses <= 5)
+        .filter((m) => m.remainingClasses > 0 && m.remainingClasses <= 3)
         .sort((a, b) => a.remainingClasses - b.remainingClasses),
     [members]
   );
@@ -372,7 +377,7 @@ export default function Reports() {
       <div className="card overflow-hidden">
         <div className="p-5 border-b border-ink-100">
           <h3 className="section-title">待续费会员</h3>
-          <p className="text-sm text-ink-500 mt-0.5">剩余课时 ≤ 5</p>
+          <p className="text-sm text-ink-500 mt-0.5">剩余课时 ≤ 3</p>
         </div>
         {toRenew.length === 0 ? (
           <div className="p-10 text-center text-ink-500">暂无待续费会员</div>

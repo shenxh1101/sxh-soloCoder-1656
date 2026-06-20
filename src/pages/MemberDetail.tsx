@@ -9,7 +9,7 @@ import { BodyChart } from '@/components/ui/BodyChart';
 import { PlanDayEditor } from '@/components/ui/PlanDayEditor';
 import { MeasurementForm } from '@/components/forms/MeasurementForm';
 import { useAppStore } from '@/store/useAppStore';
-import { calcBMI, getWeightChange, getBodyFatChange } from '@/utils/calculations';
+import { calcBMI, getWeightChange, getBodyFatChange, getMemberStatus } from '@/utils/calculations';
 import { fmtWeight, fmtBodyFat, fmtBMI } from '@/utils/formatters';
 import { formatDate, formatDateTime, getWeekDay } from '@/utils/date';
 import { cn } from '@/lib/utils';
@@ -88,7 +88,7 @@ export default function MemberDetail() {
   const cs = ss.filter((s) => s.status === 'completed');
   const tMin = cs.reduce((a, s) => a + s.durationMin, 0);
   const hasOg = sessions.some((s) => s.status === 'ongoing');
-  const ms = MSM[m.status] || MSM.inactive;
+  const ms = MSM[getMemberStatus(m)] || MSM.inactive;
   const delM = (mid: string) => { if (confirm('确定删除?')) useAppStore.setState((s) => ({ measurements: s.measurements.filter((x) => x.id !== mid) })); };
   const onMS = (data: FSD) => { aM({ memberId: m.id, ...data }); setShowM(false); };
 
@@ -124,7 +124,7 @@ export default function MemberDetail() {
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <button onClick={() => setShowR(true)} className="btn-outline flex items-center gap-1.5 text-sm py-1"><CreditCard className="w-3.5 h-3.5" />续费</button>
-            <button onClick={() => !hasOg && sS(m.id)} disabled={hasOg} className="btn-success flex items-center gap-1.5 text-sm py-1 disabled:opacity-50"><Play className="w-3.5 h-3.5" />上课</button>
+            <button onClick={() => !hasOg && m.remainingClasses > 0 && sS(m.id)} disabled={hasOg || m.remainingClasses <= 0} className={cn('flex items-center gap-1.5 text-sm py-1', hasOg || m.remainingClasses <= 0 ? 'opacity-50 cursor-not-allowed bg-ink-200 text-ink-500' : 'btn-success')}><Play className="w-3.5 h-3.5" />{m.remainingClasses <= 0 ? '课时不足' : '上课'}</button>
             <button onClick={() => setShowM(true)} className="btn-primary flex items-center gap-1.5 text-sm py-1"><Plus className="w-3.5 h-3.5" />体测</button>
           </div>
         </div>

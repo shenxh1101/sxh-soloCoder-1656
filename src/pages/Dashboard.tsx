@@ -83,7 +83,8 @@ export default function Dashboard() {
 
   const handleStart = (sid: string) => {
     const s = sessions.find((x) => x.id === sid);
-    if (s?.status === 'scheduled') startSession(s.memberId, s.coachId);
+    const mb = s ? getMemberById(s.memberId) : undefined;
+    if (s?.status === 'scheduled' && mb && mb.remainingClasses > 0) startSession(s.memberId, s.coachId);
   };
 
   return (

@@ -9,6 +9,7 @@ import type {
   PlanExercise,
   MemberStatus,
   WeekDay,
+  RenewalRecord,
 } from '../shared/types';
 import {
   seedCoaches,
@@ -65,6 +66,7 @@ interface AppState {
   sessions: ClassSession[];
   plans: TrainingPlan[];
   planExercises: PlanExercise[];
+  renewalRecords: RenewalRecord[];
   activeSessionId: string | null;
   currentCoachId: string;
   searchKeyword: string;
@@ -116,6 +118,7 @@ export const useAppStore = create<AppState>()(
       sessions: seedSessions,
       plans: seedPlans,
       planExercises: seedPlanExercises,
+      renewalRecords: [],
       activeSessionId: seedSessions.find((s) => s.status === 'ongoing')?.id || null,
       currentCoachId: seedCoaches[0]?.id || '',
       searchKeyword: '',
@@ -184,7 +187,16 @@ export const useAppStore = create<AppState>()(
             status: getMemberStatus({ ...m, totalClasses, remainingClasses }),
           };
         });
-        set({ members });
+        const record: RenewalRecord = {
+          id: genUUID(),
+          memberId,
+          purchaseDate: todayISO(),
+          classesPurchased: extraClasses,
+        };
+        set({
+          members,
+          renewalRecords: [...get().renewalRecords, record],
+        });
       },
 
       addMeasurement: (input) => {
@@ -213,6 +225,8 @@ export const useAppStore = create<AppState>()(
           .sort((a, b) => new Date(b.measureDate).getTime() - new Date(a.measureDate).getTime()),
 
       startSession: (memberId, coachId) => {
+        const member = get().getMemberById(memberId);
+        if (!member || member.remainingClasses <= 0) return null as unknown as ClassSession;
         const cid = coachId || get().currentCoachId;
         const existingOngoing = get().sessions.find(
           (s) => s.status === 'ongoing' && s.coachId === cid
@@ -384,6 +398,7 @@ export const useAppStore = create<AppState>()(
           sessions: seedSessions,
           plans: seedPlans,
           planExercises: seedPlanExercises,
+          renewalRecords: [],
           activeSessionId: seedSessions.find((s) => s.status === 'ongoing')?.id || null,
           currentCoachId: seedCoaches[0]?.id || '',
           searchKeyword: '',
@@ -400,6 +415,7 @@ export const useAppStore = create<AppState>()(
         sessions: s.sessions,
         plans: s.plans,
         planExercises: s.planExercises,
+        renewalRecords: s.renewalRecords,
         activeSessionId: s.activeSessionId,
         currentCoachId: s.currentCoachId,
       }),

@@ -1,5 +1,6 @@
 import type { Member, MemberStatus } from '@/shared/types';
 import { useAppStore } from '@/store/useAppStore';
+import { getMemberStatus } from '@/utils/calculations';
 import { daysSince } from '@/utils/date';
 import { Eye, Edit2, Trash2, UserPlus } from 'lucide-react';
 
@@ -88,7 +89,8 @@ export function MemberTable({ members, onSelect, onEdit, onDelete }: MemberTable
           </thead>
           <tbody className="divide-y divide-ink-100">
             {members.map((member, idx) => {
-              const badge = statusBadgeMap[member.status];
+              const liveStatus = getMemberStatus(member);
+              const badge = statusBadgeMap[liveStatus];
               const pct = getProgressPct(member.totalClasses, member.remainingClasses);
               const isLow = member.remainingClasses <= 3 && member.remainingClasses > 0;
               const isEmpty = member.remainingClasses <= 0;

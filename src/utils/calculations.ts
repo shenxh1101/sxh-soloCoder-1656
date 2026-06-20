@@ -6,6 +6,7 @@ import type {
   Coach,
   CoachStat,
   MemberStatus,
+  RenewalRecord,
 } from '../shared/types';
 
 export const calcBMI = (weightKg: number, heightCm: number): number => {
@@ -15,17 +16,17 @@ export const calcBMI = (weightKg: number, heightCm: number): number => {
 };
 
 export const getMemberStatus = (member: Member): MemberStatus => {
+  if (member.lastCheckIn && daysSince(member.lastCheckIn) >= 30 && member.remainingClasses > 0) return 'churned';
   if (member.remainingClasses <= 0) return 'inactive';
   if (member.remainingClasses <= 3) return 'warning';
-  if (member.lastCheckIn && daysSince(member.lastCheckIn) >= 30) return 'churned';
-  return member.status || 'active';
+  return 'active';
 };
 
 export const isLowClasses = (member: Member): boolean =>
-  member.remainingClasses <= 3 && member.remainingClasses > 0;
+  member.remainingClasses > 0 && member.remainingClasses <= 3;
 
 export const isChurnRisk = (member: Member): boolean =>
-  member.status === 'active' &&
+  member.remainingClasses > 0 &&
   member.lastCheckIn !== null &&
   daysSince(member.lastCheckIn) >= 30;
 
@@ -65,23 +66,30 @@ export const getCoachStats = (
 export const calcRenewalRate = (
   members: Member[],
   startDate: string,
-  endDate: string
+  endDate: string,
+  renewalRecords: RenewalRecord[] = []
 ): { rate: number; renewed: number; expired: number } => {
   const start = new Date(startDate).getTime();
   const end = new Date(endDate + ' 23:59:59').getTime();
 
   let expiredCount = 0;
-  let renewedCount = 0;
 
   members.forEach((m) => {
     const joinT = new Date(m.joinDate).getTime();
     if (joinT >= start && joinT <= end) {
       expiredCount += 1;
-      if (m.totalClasses > 0 && m.remainingClasses < m.totalClasses) {
-        renewedCount += 1;
-      }
     }
   });
+
+  const renewedSet = new Set(
+    renewalRecords
+      .filter((r) => {
+        const rt = new Date(r.purchaseDate).getTime();
+        return rt >= start && rt <= end;
+      })
+      .map((r) => r.memberId)
+  );
+  const renewedCount = renewedSet.size;
 
   const rate = expiredCount > 0 ? Number(((renewedCount / expiredCount) * 100).toFixed(1)) : 0;
   return { rate, renewed: renewedCount, expired: expiredCount };
